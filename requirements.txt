@@ -1,0 +1,40 @@
+# Telegram
+aiogram==3.15.0
+
+# Config
+pydantic==2.9.2
+pydantic-settings==2.7.1
+python-dotenv==1.0.1
+
+# LLM
+ollama==0.4.7
+langchain==0.3.13
+langchain-core==0.3.28
+langchain-community==0.3.13
+langchain-ollama==0.2.2
+
+# Scraping
+playwright==1.49.1
+curl_cffi==0.7.3
+httpx==0.28.1
+tenacity==9.0.0
+
+# Images / OCR
+pillow==11.0.0
+opencv-python-headless==4.10.0.84
+pytesseract==0.3.13
+easyocr==1.7.2
+
+# Report
+pandas==2.2.3
+openpyxl==3.1.5
+
+# Storage
+aiosqlite==0.20.0
+
+# Dev / test
+pytest==8.3.4
+pytest-asyncio==0.25.0
+pytest-cov==6.0.0
+ruff==0.8.4
+mypy==1.14.0
