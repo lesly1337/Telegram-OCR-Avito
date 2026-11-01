@@ -16,6 +16,22 @@ def test_extract_imei():
     assert len(imeis) == 1
     assert imeis[0] == "356938035643809"
 
+def test_extract_imei_from_ocr_text():
+    text = "IMEI1: 354484225821337 IMEI2: 355004225821336 S/N: RFCW13XPKE"
+    result = extract_all(text)
+    assert result["IMEI"] == ["354484225821337", "355004225821336"]
+    assert result["SN"] == ["RFCW13XPKE"]
+
+def test_extract_imei_with_separators_and_attached_text():
+    assert extract_imei("IMEI: 356-938-035-643-809") == ["356938035643809"]
+    assert extract_imei("IMEI:356938035643809 Сделано в Китае") == [
+        "356938035643809"
+    ]
+
+def test_extract_imei_trims_extra_digits():
+    text = "IMEI: 0356938035643809; IMEI: 3569380356438097"
+    assert extract_imei(text) == ["356938035643809"]
+
 def test_extract_mac():
     text = "MAC: A4:2B:B0:11:22:33 and another one A4-2B-B0-11-22-44."
     macs = extract_mac(text)

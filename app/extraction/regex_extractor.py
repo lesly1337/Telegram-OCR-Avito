@@ -5,7 +5,7 @@ from typing import Dict, List
 logger = logging.getLogger(__name__)
 
 def is_valid_luhn(number: str) -> bool:
-    if not number.isdigit():
+    if not re.fullmatch(r"[0-9]+", number):
         return False
     digits = [int(d) for d in str(number)]
     odd_digits = digits[-1::-2]
@@ -20,14 +20,26 @@ def _deduplicate(items: List[str]) -> List[str]:
     return [x for x in items if not (x in seen or seen.add(x))]
 
 def extract_imei(text: str) -> List[str]:
-    pattern = r'(?<!\d)(?:\d[ -]?){14}\d(?!\d)'
-    matches = re.findall(pattern, text)
-    
     valid_imeis = []
-    for match in matches:
-        clean_imei = re.sub(r'\D', '', match)
-        if len(clean_imei) == 15 and is_valid_luhn(clean_imei):
-            valid_imeis.append(clean_imei)
+    
+    # 1. Ищем ВСЕ блоки, которые могут содержать IMEI (15+ цифр с разделителями)
+    # Используем \b, чтобы не захватывать буквы в начале/конце
+    pattern = r'(?<!\w)(\d(?:[\s\-\.:]*\d){14,})(?!\d)'
+    
+    for match in re.finditer(pattern, text):
+        # Очищаем от всего, кроме цифр
+        digits = re.sub(r'\D', '', match.group(1))
+        labeled_imei = len(digits) == 15 and re.search(
+            r'IMEI\s*\d*\s*[:=]\s*$', text[:match.start()], re.IGNORECASE
+        )
+        
+        # Скользящее окно по 15 цифр
+        # Мы НЕ выходим из цикла после первого совпадения, а проверяем все варианты
+        for start in range(len(digits) - 14):
+            candidate = digits[start : start + 15]
+            if is_valid_luhn(candidate) or labeled_imei:
+                valid_imeis.append(candidate)
+    
     return _deduplicate(valid_imeis)
 
 # MAC-адреса в форматах XX:XX:XX:XX:XX:XX или XX-XX-XX-XX-XX-XX
