@@ -27,6 +27,9 @@ class Settings(BaseSettings):
     avito_headless: bool = Field(True, alias="AVITO_HEADLESS")
     avito_use_fixtures: bool = Field(False, alias="AVITO_USE_FIXTURES")
 
+    # PROXY
+    proxy_url: str = Field("", alias="PROXY_URL")
+
     # OCR
     tesseract_cmd: str = Field("/usr/bin/tesseract", alias="TESSERACT_CMD")
     tesseract_lang: str = Field("rus+eng", alias="TESSERACT_LANG")

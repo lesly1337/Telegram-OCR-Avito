@@ -21,26 +21,45 @@ def _deduplicate(items: List[str]) -> List[str]:
 
 def extract_imei(text: str) -> List[str]:
     valid_imeis = []
+
+    # Цифра в метке IMEI1/IMEI2 не является частью номера. Без удаления
+    # метки она может образовать с номером ложное, но валидное окно Луна.
+    text = re.sub(
+        r'\bI\s*M\s*E\s*I\s*[1-9]\s*[:=]',
+        ' ',
+        text,
+        flags=re.IGNORECASE,
+    )
+    text = re.sub(
+        r'\bI\s*M\s*E\s*I\s*[:=]',
+        ' ',
+        text,
+        flags=re.IGNORECASE,
+    )
     
-    # 1. Ищем ВСЕ блоки, которые могут содержать IMEI (15+ цифр с разделителями)
-    # Используем \b, чтобы не захватывать буквы в начале/конце
-    pattern = r'(?<!\w)(\d(?:[\s\-\.:]*\d){14,})(?!\d)'
+    # Ищем блоки длиной от 15 до 18 цифр (с учетом разделителей).
+    # 18 цифр — это максимум, чтобы захватить IMEI с 1-3 лишними цифрами,
+    # но НЕ захватить 32-значный EID.
+    pattern = r'(?<!\d)(\d(?:[\s\-\.:]*\d){14,17})(?!\d)'
     
     for match in re.finditer(pattern, text):
-        # Очищаем от всего, кроме цифр
-        digits = re.sub(r'\D', '', match.group(1))
-        labeled_imei = len(digits) == 15 and re.search(
-            r'IMEI\s*\d*\s*[:=]\s*$', text[:match.start()], re.IGNORECASE
-        )
+        raw_digits = match.group(0)
+        digits = re.sub(r'\D', '', raw_digits)
+
+        # При OCR-ошибке в слове IMEI (например IMEN2) regex может увидеть
+        # блок ``2:355...``. Двоеточие после первой цифры однозначно отделяет
+        # индекс метки, поэтому не включаем его в скользящие окна.
+        if len(digits) > 15 and re.match(r'^\d[\s\.:]*:', raw_digits):
+            digits = digits[1:]
         
         # Скользящее окно по 15 цифр
-        # Мы НЕ выходим из цикла после первого совпадения, а проверяем все варианты
         for start in range(len(digits) - 14):
             candidate = digits[start : start + 15]
-            if is_valid_luhn(candidate) or labeled_imei:
+            if is_valid_luhn(candidate):
                 valid_imeis.append(candidate)
-    
+
     return _deduplicate(valid_imeis)
+
 
 # MAC-адреса в форматах XX:XX:XX:XX:XX:XX или XX-XX-XX-XX-XX-XX
 def extract_mac(text: str) -> List[str]:
@@ -49,11 +68,10 @@ def extract_mac(text: str) -> List[str]:
     return _deduplicate(macs)
 
 # Поиск серийного номера
+SN_LABEL = r'(?:S\s*[/\\|I1l]\s*N|SN|Serial(?:\s*Number)?|Серийный номер)'
+
 def extract_sn(text: str) -> List[str]:
-    pattern = (
-        r'(?<![A-Z0-9])(?:S/N|SN|Serial(?:\s*Number)?|Серийный номер)'
-        r'[\s:=\-]+([A-Z0-9]{8,15})(?![A-Z0-9])'
-    )
+    pattern = rf'(?<![A-Z0-9]){SN_LABEL}[\s:=\-]+([A-Z0-9]{{8,15}})(?![A-Z0-9])'
     results = []
     for m in re.finditer(pattern, text, re.IGNORECASE):
         val = m.group(1).upper()

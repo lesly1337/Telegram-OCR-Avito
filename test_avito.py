@@ -1,22 +1,31 @@
+import argparse
 import asyncio
 import logging
+
 from app.avito.collector import AvitoCollector
 
 logging.basicConfig(level=logging.INFO)
 
-async def main():
+
+async def main(query: str = "iphone 13", limit: int = 1):
     collector = AvitoCollector()
-    # Ищем 3 объявления
-    results = await collector.search("iphone 13", limit=3)
-    
+    results = await collector.collect(query, limit=limit)
+
     if not results:
-        print("\n❌ Ничего не найдено. Avito нас заблокировал или изменил верстку.")
-    else:
-        print("\n✅ Результаты:")
-        for i, item in enumerate(results, 1):
-            print(f"{i}. {item['title']}")
-            print(f"   URL: {item['url']}")
-            print(f"   ID: {item['avito_id']}")
+        print("\n❌ Ничего не найдено. Проверьте сообщения выше.")
+        return
+
+    for number, item in enumerate(results, 1):
+        print(f"\n✅ Объявление {number}: {item['title']}")
+        print(f"URL: {item['url']}")
+        print(f"Найдено картинок: {len(item['images'])}")
+        for i, image in enumerate(item["images"], 1):
+            print(f"{i}. {image}")
+
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    parser = argparse.ArgumentParser(description="Поиск объявлений Avito и их изображений")
+    parser.add_argument("query", nargs="?", default="iphone 13", help="Поисковый запрос")
+    parser.add_argument("--limit", type=int, default=1, help="Количество объявлений")
+    args = parser.parse_args()
+    asyncio.run(main(args.query, args.limit))

@@ -1,4 +1,3 @@
-import pytest
 from app.extraction.regex_extractor import (
     is_valid_luhn, extract_all, extract_imei, 
     extract_mac, extract_sn, extract_password
@@ -17,10 +16,26 @@ def test_extract_imei():
     assert imeis[0] == "356938035643809"
 
 def test_extract_imei_from_ocr_text():
-    text = "IMEI1: 354484225821337 IMEI2: 355004225821336 S/N: RFCW13XPKE"
+    # Используем два 100% валидных IMEI
+    text = "IMEI1: 354484225821337 IMEI2: 356938035643809 S/N: RFCW13XPKE"
     result = extract_all(text)
-    assert result["IMEI"] == ["354484225821337", "355004225821336"]
+    assert result["IMEI"] == ["354484225821337", "356938035643809"]
     assert result["SN"] == ["RFCW13XPKE"]
+
+def test_extract_multiple_labeled_imeis_without_label_digits():
+    text = (
+        "IMEI1: 354484225821337 "
+        "IMEI2: 355064225821336 "
+        "IMEI3: 356938035643809"
+    )
+    assert extract_imei(text) == [
+        "354484225821337",
+        "355064225821336",
+        "356938035643809",
+    ]
+
+def test_extract_imei_ignores_index_after_misread_label():
+    assert extract_imei("IMEN2::355064225821336") == ["355064225821336"]
 
 def test_extract_imei_with_separators_and_attached_text():
     assert extract_imei("IMEI: 356-938-035-643-809") == ["356938035643809"]
