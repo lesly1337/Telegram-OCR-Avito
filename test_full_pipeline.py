@@ -14,7 +14,6 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 def format_val(val_list):
-    """Возвращает строку через запятую или прочерк, если пусто."""
     if not val_list:
         return "-"
     return ", ".join(val_list)

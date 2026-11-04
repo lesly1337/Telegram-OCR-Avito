@@ -93,7 +93,7 @@ class AvitoCollector:
             if not self.headless:
                 logger.info("Ожидание результатов до 30 секунд; при необходимости решите проверку в браузере.")
             try:
-                # Время используется только если выдача ещё не загружена или нужна проверка.
+                
                 await page.wait_for_selector(SEARCH_SELECTOR, timeout=30000)
             except PlaywrightTimeoutError:
                 await self._diagnose_page(page, "Карточки")
@@ -157,7 +157,7 @@ class AvitoCollector:
             if challenge and any(word in current_title for word in ("проверка", "доступ ограничен", "captcha")):
                 await self._diagnose_page(page, "Картинки")
                 return []
-        # Берём только галерею и метаданные объявления, не фото из рекомендаций.
+                
         data = await page.evaluate('''selector => {
             const urls = [];
             for (const gallery of document.querySelectorAll(selector)) {
@@ -192,8 +192,6 @@ class AvitoCollector:
             image_url = urljoin(page.url, candidate)
             scheme = urlsplit(image_url).scheme
             
-            # --- НОВАЯ ПРОВЕРКА ---
-            # Оставляем только реальные фото товаров Avito, отсекаем SVG-иконки и картинки для соцсетей
             if scheme in ("http", "https") and "img.avito.st/image/" in image_url:
                 if image_url not in images:
                     images.append(image_url)
@@ -214,7 +212,7 @@ class AvitoCollector:
                 await context.close()
 
     async def collect(self, query: str, limit: int | None = None) -> list[dict[str, Any]]:
-        """Собирает объявления и фотографии, используя одну сессию браузера."""
+        
         if limit is None:
             limit = settings.avito_max_items_default
         if limit <= 0 or not await self.check_proxy():
@@ -253,7 +251,7 @@ class AvitoCollector:
 
 
 def _jsonld_images(value: Any) -> list[str]:
-    """Извлекает изображения товара из JSON-LD, игнорируя рекомендации."""
+    
     if isinstance(value, list):
         return [image for item in value for image in _jsonld_images(item)]
     if not isinstance(value, dict):
