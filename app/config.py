@@ -27,8 +27,9 @@ class Settings(BaseSettings):
     avito_headless: bool = Field(True, alias="AVITO_HEADLESS")
     avito_use_fixtures: bool = Field(False, alias="AVITO_USE_FIXTURES")
 
-    # PROXY
+    # Independent proxies: Avito (PROXY_URL, retained for compatibility) and Telegram
     proxy_url: str = Field("", alias="PROXY_URL")
+    telegram_proxy_url: str = Field("", alias="TELEGRAM_PROXY_URL")
 
     # OCR
     tesseract_cmd: str = Field("/usr/bin/tesseract", alias="TESSERACT_CMD")

@@ -4,8 +4,9 @@ import logging
 import re
 from pathlib import Path
 from typing import Any
-from urllib.parse import quote, urljoin, urlsplit, urlunsplit
+from urllib.parse import quote, unquote, urljoin, urlsplit, urlunsplit
 
+from curl_cffi import CurlOpt
 from curl_cffi import requests as curl_requests
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from playwright.async_api import async_playwright
@@ -19,6 +20,8 @@ SEARCH_SELECTOR = 'a[data-marker="item-title"]'
 GALLERY_SELECTOR = '[data-marker*="gallery"], [data-marker*="image-frame"], [data-marker*="image-slider"]'
 
 
+class AvitoAccessBlockedError(RuntimeError):
+
 class AvitoCollector:
     def __init__(self):
         self.base_url = settings.avito_base_url
@@ -30,28 +33,38 @@ class AvitoCollector:
         if not self.proxy_url:
             return None
         parsed = urlsplit(self.proxy_url)
-        proxy = {"server": f"{parsed.scheme}://{parsed.hostname}:{parsed.port}"}
-        if parsed.username:
-            proxy["username"] = parsed.username
-        if parsed.password:
-            proxy["password"] = parsed.password
+        host = parsed.hostname
+        if not parsed.scheme or not host or not parsed.port:
+            raise ValueError("PROXY_URL должен содержать протокол, адрес и порт")
+        if ":" in host:
+            host = f"[{host}]"
+        proxy = {"server": f"{parsed.scheme}://{host}:{parsed.port}"}
+        if parsed.username is not None:
+            proxy["username"] = unquote(parsed.username)
+        if parsed.password is not None:
+            proxy["password"] = unquote(parsed.password)
         return proxy
+
+    def _curl_proxy_options(self) -> dict:
+        if self.proxy_url:
+            return {"proxies": {"http": self.proxy_url, "https": self.proxy_url},
+                    "curl_options": {CurlOpt.NOPROXY: ""}}
+        return {"curl_options": {CurlOpt.PROXY: ""}}
 
     async def check_proxy(self) -> bool:
         if not self.proxy_url:
             return True
-        logger.info("Проверка доступности прокси...")
+        logger.info("Проверка доступности прокси Avito...")
         try:
             response = await asyncio.to_thread(
                 curl_requests.get, "https://api.ipify.org?format=json",
-                proxies={"https": self.proxy_url}, impersonate="chrome110", timeout=10,
+                impersonate="chrome110", timeout=10, **self._curl_proxy_options(),
             )
             if response.status_code == 200:
-                logger.info("Прокси работает. Внешний IP: %s", response.json().get("ip"))
                 return True
-            logger.error("Прокси не отвечает: HTTP %s", response.status_code)
+            logger.error("Прокси Avito не отвечает: HTTP %s", response.status_code)
         except Exception as e:
-            logger.error("Ошибка прокси: %s", e)
+            logger.error("Ошибка прокси Avito: %s", e)
         return False
 
     async def _init_browser(self, p):
@@ -96,7 +109,10 @@ class AvitoCollector:
                 
                 await page.wait_for_selector(SEARCH_SELECTOR, timeout=30000)
             except PlaywrightTimeoutError:
+                title = (await page.title()).lower()
                 await self._diagnose_page(page, "Карточки")
+                if any(word in title for word in ("проверка", "доступ ограничен", "captcha")):
+                    raise AvitoAccessBlockedError("Avito запросил проверку доступа")
                 break
             items = await page.query_selector_all(SEARCH_SELECTOR)
             logger.info("Найдено карточек на странице: %s", len(items))
@@ -137,6 +153,8 @@ class AvitoCollector:
             context, page = await self._init_browser(p)
             try:
                 return await self._search_on_page(page, query, limit)
+            except AvitoAccessBlockedError:
+                raise
             except Exception:
                 logger.exception("Ошибка при поиске Avito")
                 return []
@@ -222,6 +240,8 @@ class AvitoCollector:
             try:
                 try:
                     results = await self._search_on_page(page, query, limit)
+                except AvitoAccessBlockedError:
+                    raise
                 except Exception:
                     logger.exception("Ошибка при поиске Avito")
                     return []
@@ -237,9 +257,9 @@ class AvitoCollector:
 
     async def download_image(self, image_url: str, save_path: str) -> bool:
         try:
-            proxies = {"https": self.proxy_url} if self.proxy_url else None
             response = await asyncio.to_thread(
-                curl_requests.get, image_url, impersonate="chrome110", timeout=15, proxies=proxies,
+                curl_requests.get, image_url, impersonate="chrome110", timeout=15,
+                **self._curl_proxy_options(),
             )
             if response.status_code == 200:
                 Path(save_path).write_bytes(response.content)

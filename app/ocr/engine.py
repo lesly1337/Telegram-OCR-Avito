@@ -9,14 +9,13 @@ from app.config import settings
 logger = logging.getLogger(__name__)
 
 try:
-    # Инициализируем один раз при запуске
     reader = Reader(['ru', 'en'], gpu=False)
 except Exception as e:
     logger.error(f"Не удалось инициализировать EasyOCR: {e}")
     reader = None
 
 def preprocess_image(image_path: str) -> np.ndarray:
-    """Мягкая предобработка для улучшения контраста (используется в Tesseract)."""
+    
     img = cv2.imread(image_path)
     if img is None:
         raise ValueError(f"Не удалось загрузить изображение: {image_path}")
@@ -30,7 +29,8 @@ def preprocess_image(image_path: str) -> np.ndarray:
 
 def run_tesseract(image_path: str) -> str:
     try:
-        # Tesseract лучше работает с оригиналом (или нашей мягкой предобработкой)
+        pytesseract.pytesseract.tesseract_cmd = settings.tesseract_cmd
+        
         processed_img = preprocess_image(image_path)
         config = '--psm 6'
         text = pytesseract.image_to_string(processed_img, lang=settings.tesseract_lang, config=config)
@@ -50,7 +50,6 @@ def run_easyocr(image_path: str) -> str:
         return ""
 
 def extract_text_from_image(image_path: str) -> dict:
-    """Запускает оба движка и возвращает объединенный текст."""
     logger.info(f"Запуск OCR для {image_path}")
     
     easy_text = run_easyocr(image_path)

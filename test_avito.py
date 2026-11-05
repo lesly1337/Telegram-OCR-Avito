@@ -2,14 +2,18 @@ import argparse
 import asyncio
 import logging
 
-from app.avito.collector import AvitoCollector
+from app.avito.collector import AvitoAccessBlockedError, AvitoCollector
 
 logging.basicConfig(level=logging.INFO)
 
 
 async def main(query: str = "iphone 13", limit: int = 1):
     collector = AvitoCollector()
-    results = await collector.collect(query, limit=limit)
+    try:
+        results = await collector.collect(query, limit=limit)
+    except AvitoAccessBlockedError:
+        print("\n❌ Avito запросил проверку. Проверьте прокси или пройдите её в браузере.")
+        return
 
     if not results:
         print("\n❌ Ничего не найдено. Проверьте сообщения выше.")

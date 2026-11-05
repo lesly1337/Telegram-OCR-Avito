@@ -59,4 +59,58 @@ async def create_job(user_id: int, query: str) -> int:
         await db.commit()
         return cursor.lastrowid
 
-# Здесь позже добавим функции сохранения объявлений и сущностей
+
+async def get_cached_listing(avito_id: str):
+    """Проверяет, есть ли объявление в БД, и возвращает его сущности."""
+    if not avito_id:
+        return None
+        
+    async with aiosqlite.connect(settings.db_path) as db:
+        db.row_factory = aiosqlite.Row
+        # 1. Ищем объявление
+        async with db.execute("SELECT id, url, title FROM listings WHERE avito_id = ?", (avito_id,)) as cursor:
+            listing = await cursor.fetchone()
+            if not listing:
+                return None
+                
+            listing_id = listing['id']
+            
+        # 2. Достаем сохраненные сущности
+        entities = {"IMEI": [], "SN": [], "MAC": [], "PASSWORD": []}
+        async with db.execute("SELECT entity_type, value FROM entities WHERE listing_id = ?", (listing_id,)) as cursor:
+            async for row in cursor:
+                e_type = row['entity_type']
+                if e_type in entities:
+                    entities[e_type].append(row['value'])
+                    
+        return {
+            "url": listing['url'],
+            "title": listing['title'],
+            "entities": entities
+        }
+
+async def save_listing_to_cache(job_id: int, avito_id: str, url: str, title: str, entities: dict):
+    if not avito_id:
+        return
+        
+    async with aiosqlite.connect(settings.db_path) as db:
+        try:
+            await db.execute(
+                "INSERT OR IGNORE INTO listings (job_id, avito_id, url, title) VALUES (?, ?, ?, ?)",
+                (job_id, avito_id, url, title)
+            )
+            # ID объявления (нового или существующего)
+            async with db.execute("SELECT id FROM listings WHERE avito_id = ?", (avito_id,)) as cursor:
+                row = await cursor.fetchone()
+                listing_id = row[0]
+                
+            for e_type, values in entities.items():
+                for val in values:
+                    await db.execute(
+                        "INSERT OR IGNORE INTO entities (listing_id, entity_type, value) VALUES (?, ?, ?)",
+                        (listing_id, e_type, val)
+                    )
+            await db.commit()
+            logger.info(f"Объявление {avito_id} сохранено в БД.")
+        except Exception as e:
+            logger.error(f"Ошибка сохранения в БД: {e}")

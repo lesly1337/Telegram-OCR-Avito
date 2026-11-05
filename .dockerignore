@@ -1,0 +1,12 @@
+.git
+.env
+.env.*
+3proxy.cfg
+data
+venv
+.venv
+__pycache__
+*.pyc
+.pytest_cache
+.ruff_cache
+.mypy_cache

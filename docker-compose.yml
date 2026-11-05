@@ -1,0 +1,26 @@
+services:
+  bot:
+    build: .
+    env_file:
+      - .env
+    environment:
+      OLLAMA_BASE_URL: http://ollama:11434
+      TELEGRAM_PROXY_URL: ${TELEGRAM_DOCKER_PROXY_URL:-${TELEGRAM_PROXY_URL:-}}
+      NO_PROXY: ollama,localhost,127.0.0.1
+      no_proxy: ollama,localhost,127.0.0.1
+      TESSERACT_CMD: /usr/bin/tesseract
+      AVITO_HEADLESS: "true"
+    depends_on:
+      - ollama
+    volumes:
+      - ./data:/app/data
+
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "127.0.0.1:${OLLAMA_HOST_PORT:-11435}:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+
+volumes:
+  ollama_data:
